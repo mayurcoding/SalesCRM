@@ -1,92 +1,228 @@
-# SalesCRM - A MERN Stack CRM Application
+# Sales CRM - MERN Stack Application
 
-SalesCRM is a full-stack Customer Relationship Management (CRM) application built with the MERN stack (MongoDB, Express, React, Node.js). It provides a feature-rich platform for managing leads, tracking sales, and organizing employee data.
+A comprehensive Sales Customer Relationship Management system built with the MERN stack (MongoDB, Express.js, React.js, Node.js).
 
-## Features
+## 🚀 Features
 
-*   **Dashboard:** An analytics dashboard with data visualizations for sales, revenue, and new customers.
-*   **Lead Management:** A complete system for adding, viewing, and managing customer leads, including a CSV upload feature.
-*   **Employee Management:** A detailed employee directory with pagination, status indicators, and actions for editing and deleting records.
-*   **User Settings:** A dedicated page for users to manage their profile information.
-*   **RESTful API:** A backend built with Express.js and Mongoose to handle all data operations.
+### Admin Dashboard
+- **Real-time Analytics**: Sales performance charts and statistics
+- **Lead Management**: Complete CRUD operations for leads
+- **Employee Management**: Add, edit, delete, and manage employees
+- **CSV Upload**: Bulk lead import with drag-and-drop functionality
+- **Activity Tracking**: Recent activity feed with timestamps
+- **Responsive Design**: Works on desktop, tablet, and mobile
 
-## Project Structure
+### Lead Management
+- **Lead Distribution**: Smart assignment based on location/language preferences
+- **Status Tracking**: Open/Closed, Hot/Warm/Cold lead classification
+- **Search & Filter**: Advanced search across all lead fields
+- **CSV Processing**: Upload multiple leads with verification
+- **Assignment Logic**: Priority-based distribution to employees
 
-The project is organized into two main directories:
+### Employee Management
+- **Pagination**: Efficient data loading with pagination
+- **Sorting**: Click column headers to sort data
+- **Search**: Search across employee information
+- **CRUD Operations**: Full create, read, update, delete functionality
+- **Role-based Access**: Admin-only employee management
 
-*   `/client`: Contains the React frontend application.
-*   `/server`: Contains the Node.js, Express, and MongoDB backend application.
-
-Each directory is a separate Node.js project with its own dependencies and scripts.
-
-## Getting Started
-
-To get a local copy up and running, follow these steps.
-
-### Prerequisites
-
-*   Node.js (`^14.x` or newer)
-*   npm (usually comes with Node.js)
-*   MongoDB (you'll need a running instance or a connection string from a service like MongoDB Atlas)
-
-### Setup
-
-1.  **Clone the repository:**
-    ```sh
-    git clone https://github.com/mayurcoding/SalesCRM.git
-    cd SalesCRM
-    ```
-
-2.  **Set up the Server:**
-    *   Navigate to the `server` directory.
-        ```sh
-        cd server
-        ```
-    *   Install the dependencies.
-        ```sh
-        npm install
-        ```
-    *   Create a `.env` file in the `server` directory and add your MongoDB connection string:
-        ```
-        MONGODB_URI=your_mongodb_connection_string
-        ```
-    *   Start the server.
-        ```sh
-        npm start
-        ```
-    The server will be running on `http://localhost:5000` (or the port specified in your environment).
-
-3.  **Set up the Client:**
-    *   Open a new terminal and navigate to the `client` directory.
-        ```sh
-        cd client
-        ```
-    *   Install the dependencies.
-        ```sh
-        npm install
-        ```
-    *   Start the React development server.
-        ```sh
-        npm start
-        ```
-    The client will be running on `http://localhost:3000` and will be set up to proxy requests to the backend server.
-
-## Technologies Used
-
-### Backend
-
-*   **Node.js:** JavaScript runtime environment.
-*   **Express:** Web framework for Node.js.
-*   **MongoDB:** NoSQL database for data storage.
-*   **Mongoose:** Object Data Modeling (ODM) library for MongoDB.
-*   **CORS:** Middleware for enabling Cross-Origin Resource Sharing.
-*   **Dotenv:** For managing environment variables.
+## 🛠️ Tech Stack
 
 ### Frontend
+- **React.js**: Modern UI framework
+- **CSS3**: Custom styling with responsive design
+- **Recharts**: Interactive data visualization
+- **React Router**: Client-side routing
+- **React Dropzone**: File upload functionality
 
-*   **React:** A JavaScript library for building user interfaces.
-*   **React Router:** For client-side routing.
-*   **Axios:** For making HTTP requests to the backend.
-*   **Recharts:** For data visualization and charts.
-*   **React Dropzone:** For file upload functionality.
-*   For more details, see the `README.md` file in the `/client` directory.
+### Backend
+- **Node.js**: Server runtime
+- **Express.js**: Web framework
+- **MongoDB**: NoSQL database
+- **Mongoose**: MongoDB object modeling
+- **JWT**: Authentication and authorization
+- **bcryptjs**: Password hashing
+- **csv-parser**: CSV file processing
+
+## 📁 Project Structure
+
+```
+crmSale/
+├── client/                 # React frontend
+│   ├── src/
+│   │   ├── components/     # Reusable UI components
+│   │   ├── pages/         # Page components
+│   │   ├── services/      # API service layer
+│   │   └── context/       # React context
+│   └── public/            # Static assets
+├── server/                # Node.js backend
+│   ├── controllers/       # Business logic
+│   ├── models/           # MongoDB schemas
+│   ├── routes/           # API routes
+│   ├── middleware/       # Custom middleware
+│   └── index.js          # Server entry point
+└── README.md             # This file
+```
+
+## 🚀 Quick Start
+
+### Prerequisites
+- Node.js (v14 or higher)
+- MongoDB (local or Atlas)
+- npm or yarn
+
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/mayurcoding/SalesCRM.git
+   cd SalesCRM
+   ```
+
+2. **Install dependencies**
+   ```bash
+   # Install backend dependencies
+   cd server
+   npm install
+   
+   # Install frontend dependencies
+   cd ../client
+   npm install
+   ```
+
+3. **Environment Setup**
+   ```bash
+   # In server directory, create .env file
+   MONGO_URI=mongodb://localhost:27017/salecrm
+   JWT_SECRET=your_super_secret_jwt_key_123
+   PORT=5000
+   ```
+
+4. **Start the application**
+   ```bash
+   # Start backend (from server directory)
+   npm start
+   
+   # Start frontend (from client directory)
+   npm start
+   ```
+
+5. **Access the application**
+   - Frontend: http://localhost:3000
+   - Backend API: http://localhost:5000
+
+## 📊 Recent Updates (Last 4 Hours)
+
+### ✅ Backend Enhancements
+- **Complete API Structure**: Full CRUD operations for all entities
+- **Authentication System**: JWT-based login/logout functionality
+- **MongoDB Integration**: Proper database models and relationships
+- **CSV Processing**: Advanced lead upload with distribution logic
+- **Error Handling**: Comprehensive error management
+- **Data Seeding**: Sample data for testing
+
+### ✅ Frontend Improvements
+- **Role Selection**: Choose between Admin and Employee views
+- **Dynamic Dashboard**: Real-time data from backend APIs
+- **Interactive Charts**: Sales analytics with hover effects
+- **Responsive Design**: Mobile-friendly interface
+- **File Upload**: Drag-and-drop CSV functionality
+- **Loading States**: Better user experience with loading indicators
+
+### ✅ New Features Added
+- **Employee Dashboard**: Dedicated employee view with assigned leads
+- **Activity Tracking**: Real-time activity feed
+- **Lead Distribution**: Smart assignment algorithms
+- **Search & Filter**: Advanced data filtering capabilities
+- **Pagination**: Efficient data loading
+- **Sorting**: Column-based data sorting
+
+## 🔧 API Endpoints
+
+### Authentication
+- `POST /api/auth/login` - User login
+- `GET /api/auth/profile` - Get user profile
+- `PUT /api/auth/profile` - Update profile
+
+### Dashboard
+- `GET /api/dashboard/stats` - Dashboard statistics
+- `GET /api/dashboard/analytics` - Sales analytics
+- `GET /api/dashboard/activities` - Recent activities
+- `GET /api/dashboard/employees` - Employee data
+
+### Leads
+- `GET /api/leads` - Get all leads (with pagination/search)
+- `POST /api/leads` - Create new lead
+- `PUT /api/leads/:id` - Update lead
+- `DELETE /api/leads/:id` - Delete lead
+- `POST /api/leads/upload-csv` - Upload CSV leads
+
+### Employees
+- `GET /api/employees` - Get all employees
+- `POST /api/employees` - Create employee
+- `PUT /api/employees/:id` - Update employee
+- `DELETE /api/employees/:id` - Delete employee
+
+## 🎯 Key Features Implemented
+
+### Dashboard Analytics
+- Real-time sales statistics
+- Interactive charts with hover effects
+- Conversion rate calculations
+- Employee performance metrics
+
+### Lead Management
+- Bulk CSV upload with verification
+- Smart lead distribution algorithms
+- Status and type classification
+- Assignment tracking
+
+### Employee Management
+- Complete CRUD operations
+- Search and pagination
+- Role-based access control
+- Performance tracking
+
+## 🔒 Security Features
+
+- JWT token authentication
+- Password hashing with bcrypt
+- Role-based access control
+- Input validation and sanitization
+- CORS configuration
+
+## 📱 Responsive Design
+
+- Mobile-first approach
+- Tablet and desktop optimization
+- Touch-friendly interface
+- Adaptive layouts
+
+## 🚀 Deployment Ready
+
+The application is ready for deployment on:
+- **Frontend**: Vercel, Netlify, or any static hosting
+- **Backend**: Heroku, Render, or any Node.js hosting
+- **Database**: MongoDB Atlas (cloud) or local MongoDB
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
+
+## 📄 License
+
+This project is licensed under the MIT License.
+
+## 👨‍💻 Author
+
+**Mayur Rastogi**
+- GitHub: [@mayurcoding](https://github.com/mayurcoding)
+- Email: mayurrastogi46@gmail.com
+
+---
+
+**Built with ❤️ using the MERN stack**
