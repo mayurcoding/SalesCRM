@@ -1,0 +1,40 @@
+/* Add your styles for the Dashboard component here */
+.dashboard {
+  padding: 20px;
+}
+
+.stats-container {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+.dashboard-main {
+    display: flex;
+    margin-bottom: 20px;
+}
+
+.dashboard-chart-area {
+    flex-grow: 3;
+    margin-right: 20px;
+}
+
+.dashboard-activity-area {
+    flex-grow: 1;
+}
+
+@media (max-width: 768px) {
+    .stats-container, .dashboard-main {
+        flex-direction: column;
+    }
+
+    .stats-card {
+        margin: 10px 0;
+        width: auto;
+    }
+
+    .dashboard-chart-area {
+        margin-right: 0;
+        margin-bottom: 20px;
+    }
+} 
