@@ -1,10 +1,8 @@
 import React from 'react';
-import { Link, useLocation, NavLink } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import './Sidebar.css';
 
 const Sidebar = ({ user }) => {
-    const location = useLocation();
-
     // Get user initials for avatar
     const getUserInitials = () => {
         if (!user) return 'U';
