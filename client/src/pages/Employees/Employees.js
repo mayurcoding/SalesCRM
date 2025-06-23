@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import './Employees.css';
 import EmployeeListTable from './EmployeeListTable';
-import Modal from '../../components/Modal';
+import Modal from '../../components/common/Modal';
 import AddEmployeeForm from './AddEmployeeForm';
 
 const Employees = () => {

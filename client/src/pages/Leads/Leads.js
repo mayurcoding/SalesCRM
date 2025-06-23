@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import './Leads.css';
-import LeadsTable from '../../components/LeadsTable';
-import Modal from '../../components/Modal';
-import CSVUploader from '../../components/CSVUploader';
+import LeadList from '../../components/lead/LeadList';
+import Modal from '../../components/common/Modal';
+import CSVUploader from '../../components/lead/CSVUploader';
 
 const Leads = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -20,7 +20,7 @@ const Leads = () => {
             <button className="add-leads-btn" onClick={openModal}>Add Leads</button>
         </div>
       </div>
-      <LeadsTable />
+      <LeadList />
       <Modal isOpen={isModalOpen} onClose={closeModal}>
         <CSVUploader onCancel={closeModal} onNext={closeModal} />
       </Modal>

@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import './CSVUploader.css';
-import CircularProgress from './ui/CircularProgress';
+import CircularProgress from '../ui/CircularProgress';
 
 const CSVUploader = ({ onCancel }) => {
   const [files, setFiles] = useState([]);

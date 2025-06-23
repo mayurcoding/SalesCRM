@@ -29,7 +29,7 @@ const EmployeeHome = () => {
         <div className="header-blue">
           <div className="logo">CanovaCRM</div>
           <div className="greeting">Good Morning</div>
-          <div className="user-name">Rajesh Mehta</div>
+          <div className="user-name">Mayur Rastogi</div>
         </div>
 
         <div className="content-grid">

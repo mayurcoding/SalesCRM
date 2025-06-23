@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import './Dashboard.css';
-import StatsCard from '../../components/StatsCard';
-import SalesAnalytics from '../../components/SalesAnalytics';
-import RecentActivity from '../../components/RecentActivity';
-import EmployeesTable from '../../components/EmployeesTable';
+import StatsCard from '../../components/dashboard/StatsCard';
+import SalesAnalytics from '../../components/dashboard/SalesAnalytics';
+import RecentActivity from '../../components/dashboard/RecentActivity';
+import EmployeesTable from '../../components/employee/EmployeesTable';
 
 const Dashboard = () => {
   // Mock data for demonstration

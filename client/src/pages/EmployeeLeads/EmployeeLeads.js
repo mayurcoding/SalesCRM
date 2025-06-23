@@ -4,22 +4,22 @@ import './EmployeeLeads.css';
 
 const leadsData = [
   {
-    name: 'Tanner Finsha',
-    email: '@Tannerfisher@gmail.com',
+    name: 'Mayur Rastogi',
+    email: 'mayurrastogi@gmail.com',
     date: 'April 04, 2025',
     status: 'Ongoing',
     statusColor: 'orange',
   },
   {
-    name: 'Tanner Finsha',
-    email: '@Tannerfisher@gmail.com',
+    name: 'Mishika Rastogi  ',
+    email: 'mishikarastogi@gmail.com',
     date: 'April 04, 2025',
     status: 'Ongoing',
     statusColor: 'yellow',
   },
   {
-    name: 'Tanner Finsha',
-    email: '@Tannerfisher@gmail.com',
+    name: 'Mishika Kapoor ',
+    email: 'mishikakapoor@gmail.com',
     date: 'April 04, 2025',
     status: 'Closed',
     statusColor: 'gray',

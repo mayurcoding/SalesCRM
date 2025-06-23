@@ -45,15 +45,15 @@ const EmployeeProfile = () => {
           <form className="profile-form" onSubmit={handleSubmit}>
             <div className="form-group">
               <label htmlFor="firstName">First name</label>
-              <input type="text" id="firstName" defaultValue="Rajesh" />
+              <input type="text" id="firstName" defaultValue="Mayur " />
             </div>
             <div className="form-group">
               <label htmlFor="lastName">Last name</label>
-              <input type="text" id="lastName" defaultValue="Mehta" />
+              <input type="text" id="lastName" defaultValue="Rastogi" />
             </div>
             <div className="form-group">
               <label htmlFor="email">Email</label>
-              <input type="email" id="email" defaultValue="Rajeshmehta03@gmail.com" />
+              <input type="email" id="email" defaultValue="mayurrastogi@gmail.com" />
             </div>
             <div className="form-group">
               <label htmlFor="password">Password</label>
