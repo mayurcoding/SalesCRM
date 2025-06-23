@@ -1,5 +1,4 @@
 import React from 'react';
-import LeadCard from './LeadCard';
 import './LeadList.css';
 
 const LeadList = () => {

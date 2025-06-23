@@ -202,9 +202,11 @@ export const leadsAPI = {
   }
 };
 
-export default {
+const api = {
   auth: authAPI,
   dashboard: dashboardAPI,
   employees: employeesAPI,
   leads: leadsAPI
-}; 
+};
+
+export default api; 
