@@ -1,5 +1,11 @@
 # Sales CRM - Frontend (React)
 
+## Project Structure & Documentation
+This README covers the React frontend of the Sales CRM project. It includes features, setup, and usage for the client app.
+
+- For a high-level project overview and setup, see the [root README](../README.md)
+- For backend/API details, see [../server/README.md](../server/README.md)
+
 The frontend application for the Sales CRM system built with React.js, featuring a modern, responsive interface with real-time data visualization and comprehensive lead/employee management.
 
 ## 🚀 Features

@@ -1,5 +1,11 @@
 # Sales CRM - Backend (Node.js/Express)
 
+## Project Structure & Documentation
+This README covers the Node.js/Express backend of the Sales CRM project. It includes API documentation, models, setup, and usage for the server app.
+
+- For a high-level project overview and setup, see the [root README](../README.md)
+- For frontend/client details, see [../client/README.md](../client/README.md)
+
 The backend API server for the Sales CRM system built with Node.js, Express.js, and MongoDB. Provides comprehensive RESTful APIs for lead management, employee management, authentication, and analytics.
 
 ## 🚀 Features

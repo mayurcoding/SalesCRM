@@ -1,5 +1,11 @@
 # Sales CRM - MERN Stack Application
 
+## Project Structure & Documentation
+This is the root README for the Sales CRM project. It provides a high-level overview, features, tech stack, and setup instructions for the entire application.
+
+- For **frontend (React) details**, see [client/README.md](client/README.md)
+- For **backend (Node.js/Express) details**, see [server/README.md](server/README.md)
+
 A comprehensive Sales Customer Relationship Management system built with the MERN stack (MongoDB, Express.js, React.js, Node.js).
 
 ## 🚀 Features
