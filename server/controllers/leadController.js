@@ -4,382 +4,577 @@ const Activity = require('../models/Activity');
 const csv = require('csv-parser');
 const fs = require('fs');
 
-// @desc    Get all leads with pagination, search, and filters
+// @desc    Get all leads with pagination and filters
 // @route   GET /api/leads
-// @access  Private
-const getLeads = async (req, res) => {
+// @access  Admin or Employee (assigned leads)
+const getAllLeads = async (req, res) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const search = req.query.search || '';
-    const status = req.query.status || '';
-    const type = req.query.type || '';
-    const assignedTo = req.query.assignedTo || '';
-    const sortBy = req.query.sortBy || 'createdAt';
-    const sortOrder = req.query.sortOrder === 'desc' ? -1 : 1;
+    const {
+      page = 1,
+      limit = 10,
+      search = '',
+      status = '',
+      type = '',
+      assignedTo = '',
+      source = '',
+      location = '',
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
+    } = req.query;
 
-    const skip = (page - 1) * limit;
-
-    // Build search query
-    let searchQuery = {};
+    // Build query
+    const query = {};
+    
+    // If employee, only show assigned leads
+    if (req.user.role === 'employee') {
+      query.assignedTo = req.user._id;
+    }
+    
     if (search) {
-      searchQuery = {
-        $or: [
-          { name: { $regex: search, $options: 'i' } },
-          { email: { $regex: search, $options: 'i' } },
-          { company: { $regex: search, $options: 'i' } },
-          { location: { $regex: search, $options: 'i' } },
-          { source: { $regex: search, $options: 'i' } }
-        ]
-      };
+      query.$text = { $search: search };
+    }
+    
+    if (status) {
+      query.status = status;
+    }
+    
+    if (type) {
+      query.type = type;
+    }
+    
+    if (assignedTo && req.user.role === 'admin') {
+      query.assignedTo = assignedTo;
+    }
+    
+    if (source) {
+      query.source = source;
+    }
+    
+    if (location) {
+      query.location = { $regex: location, $options: 'i' };
     }
 
-    // Add filters
-    if (status) searchQuery.status = status;
-    if (type) searchQuery.type = type;
-    if (assignedTo) searchQuery.assignedTo = assignedTo;
+    // Build sort object
+    const sort = {};
+    sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
 
-    // Build sort query
-    const sortQuery = {};
-    sortQuery[sortBy] = sortOrder;
+    // Calculate pagination
+    const skip = (page - 1) * limit;
 
-    const leads = await Lead.find(searchQuery)
-      .populate('assignedTo', 'firstName lastName')
-      .sort(sortQuery)
+    // Execute query
+    const leads = await Lead.find(query)
+      .populate('assignedTo', 'firstName lastName email')
+      .sort(sort)
       .skip(skip)
-      .limit(limit);
+      .limit(parseInt(limit));
 
-    const total = await Lead.countDocuments(searchQuery);
+    // Get total count
+    const total = await Lead.countDocuments(query);
+
+    // Calculate pagination info
+    const totalPages = Math.ceil(total / limit);
+    const hasNextPage = page < totalPages;
+    const hasPrevPage = page > 1;
 
     res.json({
-      leads,
+      success: true,
+      data: leads,
       pagination: {
-        currentPage: page,
-        totalPages: Math.ceil(total / limit),
+        currentPage: parseInt(page),
+        totalPages,
         totalItems: total,
-        itemsPerPage: limit
+        itemsPerPage: parseInt(limit),
+        hasNextPage,
+        hasPrevPage
       }
     });
   } catch (error) {
     console.error('Get leads error:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({
+      success: false,
+      message: 'Server error while fetching leads'
+    });
   }
 };
 
-// @desc    Get single lead
+// @desc    Get lead by ID
 // @route   GET /api/leads/:id
-// @access  Private
-const getLead = async (req, res) => {
+// @access  Admin or Employee (assigned lead)
+const getLeadById = async (req, res) => {
   try {
-    const lead = await Lead.findById(req.params.id)
-      .populate('assignedTo', 'firstName lastName');
+    const { id } = req.params;
+
+    const lead = await Lead.findById(id)
+      .populate('assignedTo', 'firstName lastName email location preferredLanguage');
 
     if (!lead) {
-      return res.status(404).json({ message: 'Lead not found' });
+      return res.status(404).json({
+        success: false,
+        message: 'Lead not found'
+      });
     }
 
-    res.json(lead);
+    // Check if employee can access this lead
+    if (req.user.role === 'employee' && lead.assignedTo?._id.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: lead
+    });
   } catch (error) {
     console.error('Get lead error:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({
+      success: false,
+      message: 'Server error while fetching lead'
+    });
   }
 };
 
 // @desc    Create new lead
 // @route   POST /api/leads
-// @access  Private
+// @access  Admin
 const createLead = async (req, res) => {
   try {
-    const { name, email, phone, company, source, location, preferredLanguage, notes } = req.body;
+    const {
+      name,
+      email,
+      phone,
+      company,
+      source,
+      status = 'open',
+      type = 'warm',
+      assignedTo,
+      location,
+      preferredLanguage,
+      notes,
+      value,
+      currency = 'USD',
+      tags
+    } = req.body;
 
+    // Validate required fields
+    if (!name || !email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Name and email are required'
+      });
+    }
+
+    // Check if lead already exists
+    const existingLead = await Lead.findOne({ email });
+    if (existingLead) {
+      return res.status(400).json({
+        success: false,
+        message: 'Lead with this email already exists'
+      });
+    }
+
+    // Validate assigned employee if provided
+    if (assignedTo) {
+      const employee = await Employee.findById(assignedTo);
+      if (!employee) {
+        return res.status(400).json({
+          success: false,
+          message: 'Assigned employee not found'
+        });
+      }
+    }
+
+    // Create new lead
     const lead = new Lead({
       name,
       email,
       phone,
       company,
       source,
+      status,
+      type,
+      assignedTo,
       location,
       preferredLanguage,
-      notes
+      notes,
+      value,
+      currency,
+      tags: tags || []
     });
 
-    const savedLead = await lead.save();
+    await lead.save();
+
+    // Update employee's assigned leads if assigned
+    if (assignedTo) {
+      await Employee.findByIdAndUpdate(assignedTo, {
+        $push: { assignedLeads: lead._id }
+      });
+    }
 
     // Log activity
-    await Activity.create({
-      type: 'lead_added',
-      description: `${req.employee.getFullName()} added new lead ${savedLead.name}`,
-      userId: req.employee._id,
-      leadId: savedLead._id
+    await Activity.logActivity({
+      user: req.user._id,
+      action: 'lead_created',
+      entityType: 'lead',
+      entityId: lead._id,
+      description: `${req.user.fullName} created new lead ${lead.name}`,
+      details: { status, type, assignedTo }
     });
 
-    res.status(201).json(savedLead);
+    const populatedLead = await Lead.findById(lead._id)
+      .populate('assignedTo', 'firstName lastName email');
+
+    res.status(201).json({
+      success: true,
+      message: 'Lead created successfully',
+      data: populatedLead
+    });
   } catch (error) {
     console.error('Create lead error:', error);
-    res.status(500).json({ message: 'Server error' });
+    
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({
+        success: false,
+        message: 'Validation error',
+        errors
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Server error while creating lead'
+    });
   }
 };
 
 // @desc    Update lead
 // @route   PUT /api/leads/:id
-// @access  Private
+// @access  Admin or Employee (assigned lead)
 const updateLead = async (req, res) => {
   try {
-    const { name, email, phone, company, source, status, type, notes, scheduledCall } = req.body;
+    const { id } = req.params;
+    const updateData = req.body;
 
-    const lead = await Lead.findById(req.params.id);
-
+    const lead = await Lead.findById(id);
     if (!lead) {
-      return res.status(404).json({ message: 'Lead not found' });
+      return res.status(404).json({
+        success: false,
+        message: 'Lead not found'
+      });
     }
 
-    // Update fields
-    if (name) lead.name = name;
-    if (email) lead.email = email;
-    if (phone) lead.phone = phone;
-    if (company) lead.company = company;
-    if (source) lead.source = source;
-    if (status) lead.status = status;
-    if (type) lead.type = type;
-    if (notes) lead.notes = notes;
-    if (scheduledCall) lead.scheduledCall = scheduledCall;
-
-    // Set closed date if status is changed to closed
-    if (status === 'closed' && lead.status !== 'closed') {
-      lead.closedDate = new Date();
+    // Check if employee can update this lead
+    if (req.user.role === 'employee' && lead.assignedTo?.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied'
+      });
     }
 
-    const updatedLead = await lead.save();
+    // Handle assignment changes
+    if (updateData.assignedTo && updateData.assignedTo !== lead.assignedTo?.toString()) {
+      // Remove from old employee
+      if (lead.assignedTo) {
+        await Employee.findByIdAndUpdate(lead.assignedTo, {
+          $pull: { assignedLeads: lead._id }
+        });
+      }
 
-    res.json(updatedLead);
+      // Add to new employee
+      await Employee.findByIdAndUpdate(updateData.assignedTo, {
+        $push: { assignedLeads: lead._id }
+      });
+
+      updateData.assignedDate = new Date();
+    }
+
+    // Handle status changes
+    if (updateData.status === 'closed' && lead.status !== 'closed') {
+      updateData.closedDate = new Date();
+    }
+
+    // Update lead
+    const updatedLead = await Lead.findByIdAndUpdate(
+      id,
+      updateData,
+      { new: true, runValidators: true }
+    ).populate('assignedTo', 'firstName lastName email');
+
+    // Log activity
+    await Activity.logActivity({
+      user: req.user._id,
+      action: 'lead_updated',
+      entityType: 'lead',
+      entityId: lead._id,
+      description: `${req.user.fullName} updated lead ${lead.name}`,
+      details: { updatedFields: Object.keys(updateData) }
+    });
+
+    res.json({
+      success: true,
+      message: 'Lead updated successfully',
+      data: updatedLead
+    });
   } catch (error) {
     console.error('Update lead error:', error);
-    res.status(500).json({ message: 'Server error' });
+    
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({
+        success: false,
+        message: 'Validation error',
+        errors
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Server error while updating lead'
+    });
   }
 };
 
 // @desc    Delete lead
 // @route   DELETE /api/leads/:id
-// @access  Private
+// @access  Admin
 const deleteLead = async (req, res) => {
   try {
-    const lead = await Lead.findById(req.params.id);
+    const { id } = req.params;
 
+    const lead = await Lead.findById(id);
     if (!lead) {
-      return res.status(404).json({ message: 'Lead not found' });
+      return res.status(404).json({
+        success: false,
+        message: 'Lead not found'
+      });
     }
 
-    await Lead.findByIdAndDelete(req.params.id);
+    // Remove from employee's assigned leads
+    if (lead.assignedTo) {
+      await Employee.findByIdAndUpdate(lead.assignedTo, {
+        $pull: { assignedLeads: lead._id }
+      });
+    }
 
-    res.json({ message: 'Lead deleted successfully' });
+    await Lead.findByIdAndDelete(id);
+
+    // Log activity
+    await Activity.logActivity({
+      user: req.user._id,
+      action: 'lead_deleted',
+      entityType: 'lead',
+      description: `${req.user.fullName} deleted lead ${lead.name}`,
+      details: { deletedLeadId: id }
+    });
+
+    res.json({
+      success: true,
+      message: 'Lead deleted successfully'
+    });
   } catch (error) {
     console.error('Delete lead error:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-// @desc    Assign lead to employee
-// @route   PUT /api/leads/:id/assign
-// @access  Private (Admin)
-const assignLead = async (req, res) => {
-  try {
-    const { employeeId } = req.body;
-
-    const lead = await Lead.findById(req.params.id);
-    const employee = await Employee.findById(employeeId);
-
-    if (!lead) {
-      return res.status(404).json({ message: 'Lead not found' });
-    }
-
-    if (!employee) {
-      return res.status(404).json({ message: 'Employee not found' });
-    }
-
-    lead.assignedTo = employeeId;
-    lead.assignedDate = new Date();
-    await lead.save();
-
-    // Add to employee's assigned leads
-    employee.assignedLeads.push(lead._id);
-    await employee.save();
-
-    // Log activity
-    await Activity.create({
-      type: 'lead_assigned',
-      description: `${req.employee.getFullName()} assigned lead ${lead.name} to ${employee.getFullName()}`,
-      userId: req.employee._id,
-      leadId: lead._id,
-      targetEmployeeId: employeeId
+    res.status(500).json({
+      success: false,
+      message: 'Server error while deleting lead'
     });
-
-    res.json(lead);
-  } catch (error) {
-    console.error('Assign lead error:', error);
-    res.status(500).json({ message: 'Server error' });
   }
 };
 
-// @desc    Close lead
-// @route   PUT /api/leads/:id/close
-// @access  Private
-const closeLead = async (req, res) => {
+// @desc    Upload leads from CSV
+// @route   POST /api/leads/upload
+// @access  Admin
+const uploadLeads = async (req, res) => {
   try {
-    const lead = await Lead.findById(req.params.id);
-
-    if (!lead) {
-      return res.status(404).json({ message: 'Lead not found' });
-    }
-
-    // Check if lead has scheduled call in the future
-    if (lead.scheduledCall && lead.scheduledCall.date > new Date()) {
-      return res.status(400).json({ 
-        message: 'Cannot close lead with scheduled call in the future' 
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'CSV file is required'
       });
     }
 
-    lead.status = 'closed';
-    lead.closedDate = new Date();
-    await lead.save();
+    const results = [];
+    const errors = [];
+    let successCount = 0;
+    let errorCount = 0;
 
-    // Log activity
-    await Activity.create({
-      type: 'lead_closed',
-      description: `${req.employee.getFullName()} closed lead ${lead.name}`,
-      userId: req.employee._id,
-      leadId: lead._id
-    });
+    // Read CSV file
+    fs.createReadStream(req.file.path)
+      .pipe(csv())
+      .on('data', (data) => {
+        results.push(data);
+      })
+      .on('end', async () => {
+        try {
+          // Process each row
+          for (let i = 0; i < results.length; i++) {
+            const row = results[i];
+            
+            try {
+              // Validate required fields
+              if (!row.name || !row.email) {
+                errors.push(`Row ${i + 1}: Name and email are required`);
+                errorCount++;
+                continue;
+              }
 
-    res.json(lead);
-  } catch (error) {
-    console.error('Close lead error:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
+              // Check if lead already exists
+              const existingLead = await Lead.findOne({ email: row.email.toLowerCase() });
+              if (existingLead) {
+                errors.push(`Row ${i + 1}: Lead with email ${row.email} already exists`);
+                errorCount++;
+                continue;
+              }
 
-// @desc    Upload CSV leads
-// @route   POST /api/leads/upload-csv
-// @access  Private (Admin)
-const uploadCSVLeads = async (req, res) => {
-  try {
-    const { leads, distributionType } = req.body;
+              // Create lead
+              const lead = new Lead({
+                name: row.name.trim(),
+                email: row.email.toLowerCase().trim(),
+                phone: row.phone?.trim() || '',
+                company: row.company?.trim() || '',
+                source: row.source?.trim() || 'Website',
+                status: row.status?.trim() || 'open',
+                type: row.type?.trim() || 'warm',
+                location: row.location?.trim() || '',
+                preferredLanguage: row.preferredLanguage?.trim() || 'English',
+                notes: row.notes?.trim() || '',
+                value: parseFloat(row.value) || 0,
+                currency: row.currency?.trim() || 'USD',
+                tags: row.tags?.split(',').map(tag => tag.trim()).filter(tag => tag) || []
+              });
 
-    if (!leads || !Array.isArray(leads) || leads.length === 0) {
-      return res.status(400).json({ message: 'No leads data provided' });
-    }
+              await lead.save();
+              successCount++;
 
-    const activeEmployees = await Employee.find({ status: 'active' });
-    
-    if (activeEmployees.length === 0) {
-      return res.status(400).json({ message: 'No active employees available for assignment' });
-    }
+              // Log activity for each lead
+              await Activity.logActivity({
+                user: req.user._id,
+                action: 'lead_imported',
+                entityType: 'lead',
+                entityId: lead._id,
+                description: `${req.user.fullName} imported lead ${lead.name} from CSV`,
+                details: { source: 'csv_upload' }
+              });
 
-    const createdLeads = [];
-    let employeeIndex = 0;
-
-    for (const leadData of leads) {
-      const lead = new Lead({
-        name: leadData.name,
-        email: leadData.email,
-        phone: leadData.phone || '',
-        company: leadData.company || '',
-        source: leadData.source || '',
-        location: leadData.location || '',
-        preferredLanguage: leadData.preferredLanguage || ''
-      });
-
-      // Assign lead based on distribution type
-      if (distributionType === 'equal') {
-        lead.assignedTo = activeEmployees[employeeIndex % activeEmployees.length]._id;
-        employeeIndex++;
-      } else if (distributionType === 'location_language') {
-        // Priority: Language and Location Match
-        const bestMatch = activeEmployees.find(emp => 
-          emp.location === leadData.location && 
-          emp.preferredLanguage === leadData.preferredLanguage
-        );
-        
-        if (bestMatch) {
-          lead.assignedTo = bestMatch._id;
-        } else {
-          // Fallback: Language or Location Match
-          const partialMatch = activeEmployees.find(emp => 
-            emp.location === leadData.location || 
-            emp.preferredLanguage === leadData.preferredLanguage
-          );
-          
-          if (partialMatch) {
-            lead.assignedTo = partialMatch._id;
-          } else {
-            // Fallback: Equal distribution
-            lead.assignedTo = activeEmployees[employeeIndex % activeEmployees.length]._id;
-            employeeIndex++;
+            } catch (error) {
+              errors.push(`Row ${i + 1}: ${error.message}`);
+              errorCount++;
+            }
           }
+
+          // Clean up uploaded file
+          fs.unlinkSync(req.file.path);
+
+          res.json({
+            success: true,
+            message: 'CSV upload completed',
+            data: {
+              totalProcessed: results.length,
+              successCount,
+              errorCount,
+              errors: errors.slice(0, 10) // Limit error messages
+            }
+          });
+
+        } catch (error) {
+          console.error('CSV processing error:', error);
+          res.status(500).json({
+            success: false,
+            message: 'Error processing CSV file'
+          });
         }
-      }
-
-      lead.assignedDate = new Date();
-      const savedLead = await lead.save();
-      createdLeads.push(savedLead);
-
-      // Add to employee's assigned leads
-      if (lead.assignedTo) {
-        const employee = await Employee.findById(lead.assignedTo);
-        employee.assignedLeads.push(savedLead._id);
-        await employee.save();
-      }
-
-      // Log activity
-      await Activity.create({
-        type: 'lead_added',
-        description: `${req.employee.getFullName()} added lead ${savedLead.name} via CSV upload`,
-        userId: req.employee._id,
-        leadId: savedLead._id
+      })
+      .on('error', (error) => {
+        console.error('CSV read error:', error);
+        res.status(500).json({
+          success: false,
+          message: 'Error reading CSV file'
+        });
       });
-    }
 
-    res.status(201).json({
-      message: `${createdLeads.length} leads created successfully`,
-      leads: createdLeads
-    });
   } catch (error) {
-    console.error('Upload CSV leads error:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.error('Upload leads error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error during CSV upload'
+    });
   }
 };
 
 // @desc    Get lead statistics
 // @route   GET /api/leads/stats
-// @access  Private
+// @access  Admin
 const getLeadStats = async (req, res) => {
   try {
+    // Get basic counts
     const totalLeads = await Lead.countDocuments();
-    const assignedLeads = await Lead.countDocuments({ assignedTo: { $exists: true, $ne: null } });
-    const unassignedLeads = totalLeads - assignedLeads;
+    const unassignedLeads = await Lead.countDocuments({ assignedTo: null });
+    const openLeads = await Lead.countDocuments({ status: { $in: ['open', 'contacted', 'qualified', 'proposal', 'negotiation'] } });
     const closedLeads = await Lead.countDocuments({ status: 'closed' });
+    const lostLeads = await Lead.countDocuments({ status: 'lost' });
+
+    // Get leads by type
+    const hotLeads = await Lead.countDocuments({ type: 'hot' });
+    const warmLeads = await Lead.countDocuments({ type: 'warm' });
+    const coldLeads = await Lead.countDocuments({ type: 'cold' });
+
+    // Get leads by source
+    const sourceStats = await Lead.aggregate([
+      {
+        $group: {
+          _id: '$source',
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $sort: { count: -1 }
+      }
+    ]);
+
+    // Get leads assigned this week
+    const thisWeek = new Date();
+    thisWeek.setDate(thisWeek.getDate() - 7);
+    const leadsThisWeek = await Lead.countDocuments({
+      assignedDate: { $gte: thisWeek }
+    });
+
+    // Get conversion rate
     const conversionRate = totalLeads > 0 ? ((closedLeads / totalLeads) * 100).toFixed(1) : 0;
 
-    res.json({
+    const stats = {
       totalLeads,
-      assignedLeads,
       unassignedLeads,
+      openLeads,
       closedLeads,
-      conversionRate: `${conversionRate}%`
+      lostLeads,
+      hotLeads,
+      warmLeads,
+      coldLeads,
+      leadsThisWeek,
+      conversionRate,
+      sourceStats
+    };
+
+    res.json({
+      success: true,
+      data: stats
     });
   } catch (error) {
     console.error('Get lead stats error:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({
+      success: false,
+      message: 'Server error while fetching lead statistics'
+    });
   }
 };
 
 module.exports = {
-  getLeads,
-  getLead,
+  getAllLeads,
+  getLeadById,
   createLead,
   updateLead,
   deleteLead,
-  assignLead,
-  closeLead,
-  uploadCSVLeads,
+  uploadLeads,
   getLeadStats
 }; 

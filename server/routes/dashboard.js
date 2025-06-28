@@ -4,13 +4,42 @@ const {
   getDashboardStats,
   getSalesAnalytics,
   getRecentActivities,
-  getDashboardEmployees
+  getEmployeeDashboard,
+  getActivitySummary
 } = require('../controllers/dashboardController');
-const { auth } = require('../middleware/auth');
+const {
+  authenticateToken,
+  requireAdmin,
+  requireEmployeeOrAdmin,
+  sanitizeInput
+} = require('../middleware/auth');
 
-router.get('/stats', auth, getDashboardStats);
-router.get('/analytics', auth, getSalesAnalytics);
-router.get('/activities', auth, getRecentActivities);
-router.get('/employees', auth, getDashboardEmployees);
+// Apply input sanitization to all routes
+router.use(sanitizeInput);
+
+// @route   GET /api/dashboard/stats
+// @desc    Get dashboard statistics
+// @access  Admin
+router.get('/stats', authenticateToken, requireAdmin, getDashboardStats);
+
+// @route   GET /api/dashboard/analytics
+// @desc    Get sales analytics
+// @access  Admin
+router.get('/analytics', authenticateToken, requireAdmin, getSalesAnalytics);
+
+// @route   GET /api/dashboard/activities
+// @desc    Get recent activities
+// @access  Admin
+router.get('/activities', authenticateToken, requireAdmin, getRecentActivities);
+
+// @route   GET /api/dashboard/activity-summary
+// @desc    Get activity summary
+// @access  Admin
+router.get('/activity-summary', authenticateToken, requireAdmin, getActivitySummary);
+
+// @route   GET /api/dashboard/employee
+// @desc    Get employee dashboard data
+// @access  Employee
+router.get('/employee', authenticateToken, requireEmployeeOrAdmin, getEmployeeDashboard);
 
 module.exports = router; 

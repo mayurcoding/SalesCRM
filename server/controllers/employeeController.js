@@ -1,235 +1,505 @@
 const Employee = require('../models/Employee');
+const Lead = require('../models/Lead');
 const Activity = require('../models/Activity');
 
-// @desc    Get all employees with pagination and search
+// @desc    Get all employees
 // @route   GET /api/employees
-// @access  Private (Admin)
-const getEmployees = async (req, res) => {
+// @access  Admin
+const getAllEmployees = async (req, res) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const search = req.query.search || '';
-    const sortBy = req.query.sortBy || 'createdAt';
-    const sortOrder = req.query.sortOrder === 'desc' ? -1 : 1;
+    const {
+      page = 1,
+      limit = 10,
+      search = '',
+      status = '',
+      role = '',
+      location = '',
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
+    } = req.query;
 
-    const skip = (page - 1) * limit;
-
-    // Build search query
-    let searchQuery = {};
+    // Build query
+    const query = {};
+    
     if (search) {
-      searchQuery = {
-        $or: [
-          { firstName: { $regex: search, $options: 'i' } },
-          { lastName: { $regex: search, $options: 'i' } },
-          { email: { $regex: search, $options: 'i' } },
-          { location: { $regex: search, $options: 'i' } },
-          { preferredLanguage: { $regex: search, $options: 'i' } }
-        ]
-      };
+      query.$text = { $search: search };
+    }
+    
+    if (status) {
+      query.status = status;
+    }
+    
+    if (role) {
+      query.role = role;
+    }
+    
+    if (location) {
+      query.location = { $regex: location, $options: 'i' };
     }
 
-    // Build sort query
-    const sortQuery = {};
-    sortQuery[sortBy] = sortOrder;
+    // Build sort object
+    const sort = {};
+    sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
 
-    const employees = await Employee.find(searchQuery)
+    // Calculate pagination
+    const skip = (page - 1) * limit;
+
+    // Execute query
+    const employees = await Employee.find(query)
       .select('-password')
-      .sort(sortQuery)
+      .populate('assignedLeads', 'name email company status type')
+      .sort(sort)
       .skip(skip)
-      .limit(limit);
+      .limit(parseInt(limit));
 
-    const total = await Employee.countDocuments(searchQuery);
+    // Get total count
+    const total = await Employee.countDocuments(query);
+
+    // Calculate pagination info
+    const totalPages = Math.ceil(total / limit);
+    const hasNextPage = page < totalPages;
+    const hasPrevPage = page > 1;
 
     res.json({
-      employees,
+      success: true,
+      data: employees,
       pagination: {
-        currentPage: page,
-        totalPages: Math.ceil(total / limit),
+        currentPage: parseInt(page),
+        totalPages,
         totalItems: total,
-        itemsPerPage: limit
+        itemsPerPage: parseInt(limit),
+        hasNextPage,
+        hasPrevPage
       }
     });
   } catch (error) {
     console.error('Get employees error:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({
+      success: false,
+      message: 'Server error while fetching employees'
+    });
   }
 };
 
-// @desc    Get single employee
+// @desc    Get employee by ID
 // @route   GET /api/employees/:id
-// @access  Private (Admin)
-const getEmployee = async (req, res) => {
+// @access  Admin or Employee (own profile)
+const getEmployeeById = async (req, res) => {
   try {
-    const employee = await Employee.findById(req.params.id).select('-password');
+    const { id } = req.params;
 
-    if (!employee) {
-      return res.status(404).json({ message: 'Employee not found' });
+    // Check if user is requesting their own profile or is admin
+    if (req.user.role !== 'admin' && req.user._id.toString() !== id) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied'
+      });
     }
 
-    res.json(employee);
+    const employee = await Employee.findById(id)
+      .select('-password')
+      .populate('assignedLeads', 'name email company status type assignedDate');
+
+    if (!employee) {
+      return res.status(404).json({
+        success: false,
+        message: 'Employee not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: employee
+    });
   } catch (error) {
     console.error('Get employee error:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({
+      success: false,
+      message: 'Server error while fetching employee'
+    });
   }
 };
 
 // @desc    Create new employee
 // @route   POST /api/employees
-// @access  Private (Admin)
+// @access  Admin
 const createEmployee = async (req, res) => {
   try {
-    const { firstName, lastName, email, location, preferredLanguage, role } = req.body;
+    const {
+      firstName,
+      lastName,
+      email,
+      password,
+      location,
+      preferredLanguage,
+      phone,
+      department,
+      role = 'employee'
+    } = req.body;
 
     // Check if employee already exists
     const existingEmployee = await Employee.findOne({ email });
     if (existingEmployee) {
-      return res.status(400).json({ message: 'Employee with this email already exists' });
+      return res.status(400).json({
+        success: false,
+        message: 'Employee with this email already exists'
+      });
     }
 
-    // Create employee with default password as last name
+    // Create new employee
     const employee = new Employee({
       firstName,
       lastName,
       email,
+      password,
       location,
       preferredLanguage,
-      role: role || 'employee',
-      password: lastName // Will be hashed by pre-save middleware
+      phone,
+      department,
+      role
     });
 
-    const savedEmployee = await employee.save();
+    await employee.save();
 
     // Log activity
-    await Activity.create({
-      type: 'employee_added',
-      description: `${req.employee.getFullName()} added new employee ${savedEmployee.getFullName()}`,
-      userId: req.employee._id,
-      targetEmployeeId: savedEmployee._id
+    await Activity.logActivity({
+      user: req.user._id,
+      action: 'employee_created',
+      entityType: 'employee',
+      entityId: employee._id,
+      description: `${req.user.fullName} created new employee ${employee.fullName}`,
+      details: { role, department }
     });
 
+    const employeeData = employee.getPublicProfile();
+
     res.status(201).json({
-      _id: savedEmployee._id,
-      firstName: savedEmployee.firstName,
-      lastName: savedEmployee.lastName,
-      email: savedEmployee.email,
-      location: savedEmployee.location,
-      preferredLanguage: savedEmployee.preferredLanguage,
-      role: savedEmployee.role,
-      status: savedEmployee.status
+      success: true,
+      message: 'Employee created successfully',
+      data: employeeData
     });
   } catch (error) {
     console.error('Create employee error:', error);
-    if (error.code === 11000) {
-      return res.status(400).json({ message: 'Email already exists' });
+    
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({
+        success: false,
+        message: 'Validation error',
+        errors
+      });
     }
-    res.status(500).json({ message: 'Server error' });
+
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email already exists'
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Server error while creating employee'
+    });
   }
 };
 
 // @desc    Update employee
 // @route   PUT /api/employees/:id
-// @access  Private (Admin)
+// @access  Admin or Employee (own profile)
 const updateEmployee = async (req, res) => {
   try {
-    const { firstName, lastName, email, location, preferredLanguage, status } = req.body;
+    const { id } = req.params;
+    const {
+      firstName,
+      lastName,
+      location,
+      preferredLanguage,
+      phone,
+      department,
+      status,
+      role
+    } = req.body;
 
-    const employee = await Employee.findById(req.params.id);
-
-    if (!employee) {
-      return res.status(404).json({ message: 'Employee not found' });
+    // Check permissions
+    if (req.user.role !== 'admin' && req.user._id.toString() !== id) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied'
+      });
     }
 
-    // Update fields (language and location cannot be changed in edit mode)
+    // Find employee
+    const employee = await Employee.findById(id);
+    if (!employee) {
+      return res.status(404).json({
+        success: false,
+        message: 'Employee not found'
+      });
+    }
+
+    // Update fields
     if (firstName) employee.firstName = firstName;
     if (lastName) employee.lastName = lastName;
-    if (email) employee.email = email;
-    if (status) employee.status = status;
+    if (location) employee.location = location;
+    if (preferredLanguage) employee.preferredLanguage = preferredLanguage;
+    if (phone) employee.phone = phone;
+    if (department) employee.department = department;
+    
+    // Only admin can update these fields
+    if (req.user.role === 'admin') {
+      if (status) employee.status = status;
+      if (role) employee.role = role;
+    }
 
-    const updatedEmployee = await employee.save();
+    await employee.save();
 
     // Log activity
-    await Activity.create({
-      type: 'employee_updated',
-      description: `${req.employee.getFullName()} updated employee ${updatedEmployee.getFullName()}`,
-      userId: req.employee._id,
-      targetEmployeeId: updatedEmployee._id
+    await Activity.logActivity({
+      user: req.user._id,
+      action: 'employee_updated',
+      entityType: 'employee',
+      entityId: employee._id,
+      description: `${req.user.fullName} updated employee ${employee.fullName}`,
+      details: { updatedFields: Object.keys(req.body) }
     });
 
+    const employeeData = employee.getPublicProfile();
+
     res.json({
-      _id: updatedEmployee._id,
-      firstName: updatedEmployee.firstName,
-      lastName: updatedEmployee.lastName,
-      email: updatedEmployee.email,
-      location: updatedEmployee.location,
-      preferredLanguage: updatedEmployee.preferredLanguage,
-      role: updatedEmployee.role,
-      status: updatedEmployee.status
+      success: true,
+      message: 'Employee updated successfully',
+      data: employeeData
     });
   } catch (error) {
     console.error('Update employee error:', error);
-    if (error.code === 11000) {
-      return res.status(400).json({ message: 'Email already exists' });
+    
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({
+        success: false,
+        message: 'Validation error',
+        errors
+      });
     }
-    res.status(500).json({ message: 'Server error' });
+
+    res.status(500).json({
+      success: false,
+      message: 'Server error while updating employee'
+    });
   }
 };
 
 // @desc    Delete employee
 // @route   DELETE /api/employees/:id
-// @access  Private (Admin)
+// @access  Admin
 const deleteEmployee = async (req, res) => {
   try {
-    const employee = await Employee.findById(req.params.id);
+    const { id } = req.params;
 
-    if (!employee) {
-      return res.status(404).json({ message: 'Employee not found' });
-    }
-
-    // Check if employee has assigned leads
-    if (employee.assignedLeads && employee.assignedLeads.length > 0) {
-      return res.status(400).json({ 
-        message: 'Cannot delete employee with assigned leads. Please reassign leads first.' 
+    // Prevent admin from deleting themselves
+    if (req.user._id.toString() === id) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot delete your own account'
       });
     }
 
-    await Employee.findByIdAndDelete(req.params.id);
+    const employee = await Employee.findById(id);
+    if (!employee) {
+      return res.status(404).json({
+        success: false,
+        message: 'Employee not found'
+      });
+    }
+
+    // Check if employee has assigned leads
+    const assignedLeads = await Lead.countDocuments({ assignedTo: id });
+    if (assignedLeads > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot delete employee with ${assignedLeads} assigned leads. Please reassign leads first.`
+      });
+    }
+
+    await Employee.findByIdAndDelete(id);
 
     // Log activity
-    await Activity.create({
-      type: 'employee_updated',
-      description: `${req.employee.getFullName()} deleted employee ${employee.getFullName()}`,
-      userId: req.employee._id,
-      targetEmployeeId: employee._id
+    await Activity.logActivity({
+      user: req.user._id,
+      action: 'employee_deleted',
+      entityType: 'employee',
+      description: `${req.user.fullName} deleted employee ${employee.fullName}`,
+      details: { deletedEmployeeId: id }
     });
 
-    res.json({ message: 'Employee deleted successfully' });
+    res.json({
+      success: true,
+      message: 'Employee deleted successfully'
+    });
   } catch (error) {
     console.error('Delete employee error:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({
+      success: false,
+      message: 'Server error while deleting employee'
+    });
   }
 };
 
-// @desc    Get active employees for lead assignment
-// @route   GET /api/employees/active
-// @access  Private (Admin)
-const getActiveEmployees = async (req, res) => {
+// @desc    Get employee statistics
+// @route   GET /api/employees/:id/stats
+// @access  Admin or Employee (own stats)
+const getEmployeeStats = async (req, res) => {
   try {
-    const employees = await Employee.find({ status: 'active' })
-      .select('firstName lastName location preferredLanguage')
-      .sort({ firstName: 1, lastName: 1 });
+    const { id } = req.params;
 
-    res.json(employees);
+    // Check permissions
+    if (req.user.role !== 'admin' && req.user._id.toString() !== id) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied'
+      });
+    }
+
+    const employee = await Employee.findById(id);
+    if (!employee) {
+      return res.status(404).json({
+        success: false,
+        message: 'Employee not found'
+      });
+    }
+
+    // Get lead statistics
+    const totalLeads = await Lead.countDocuments({ assignedTo: id });
+    const openLeads = await Lead.countDocuments({ assignedTo: id, status: { $in: ['open', 'contacted', 'qualified', 'proposal', 'negotiation'] } });
+    const closedLeads = await Lead.countDocuments({ assignedTo: id, status: 'closed' });
+    const lostLeads = await Lead.countDocuments({ assignedTo: id, status: 'lost' });
+
+    // Get recent activities
+    const recentActivities = await Activity.getRecentActivities(5, id);
+
+    // Get performance metrics
+    const thisMonth = new Date();
+    thisMonth.setDate(1);
+    thisMonth.setHours(0, 0, 0, 0);
+
+    const leadsThisMonth = await Lead.countDocuments({
+      assignedTo: id,
+      assignedDate: { $gte: thisMonth }
+    });
+
+    const closedThisMonth = await Lead.countDocuments({
+      assignedTo: id,
+      status: 'closed',
+      closedDate: { $gte: thisMonth }
+    });
+
+    const stats = {
+      totalLeads,
+      openLeads,
+      closedLeads,
+      lostLeads,
+      leadsThisMonth,
+      closedThisMonth,
+      conversionRate: totalLeads > 0 ? ((closedLeads / totalLeads) * 100).toFixed(1) : 0,
+      recentActivities
+    };
+
+    res.json({
+      success: true,
+      data: stats
+    });
   } catch (error) {
-    console.error('Get active employees error:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.error('Get employee stats error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while fetching employee statistics'
+    });
+  }
+};
+
+// @desc    Get employee leads
+// @route   GET /api/employees/:id/leads
+// @access  Admin or Employee (own leads)
+const getEmployeeLeads = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      page = 1,
+      limit = 10,
+      status = '',
+      type = '',
+      sortBy = 'assignedDate',
+      sortOrder = 'desc'
+    } = req.query;
+
+    // Check permissions
+    if (req.user.role !== 'admin' && req.user._id.toString() !== id) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied'
+      });
+    }
+
+    // Build query
+    const query = { assignedTo: id };
+    
+    if (status) {
+      query.status = status;
+    }
+    
+    if (type) {
+      query.type = type;
+    }
+
+    // Build sort object
+    const sort = {};
+    sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
+
+    // Calculate pagination
+    const skip = (page - 1) * limit;
+
+    // Execute query
+    const leads = await Lead.find(query)
+      .sort(sort)
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    // Get total count
+    const total = await Lead.countDocuments(query);
+
+    // Calculate pagination info
+    const totalPages = Math.ceil(total / limit);
+    const hasNextPage = page < totalPages;
+    const hasPrevPage = page > 1;
+
+    res.json({
+      success: true,
+      data: leads,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages,
+        totalItems: total,
+        itemsPerPage: parseInt(limit),
+        hasNextPage,
+        hasPrevPage
+      }
+    });
+  } catch (error) {
+    console.error('Get employee leads error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while fetching employee leads'
+    });
   }
 };
 
 module.exports = {
-  getEmployees,
-  getEmployee,
+  getAllEmployees,
+  getEmployeeById,
   createEmployee,
   updateEmployee,
   deleteEmployee,
-  getActiveEmployees
+  getEmployeeStats,
+  getEmployeeLeads
 }; 

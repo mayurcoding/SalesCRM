@@ -5,186 +5,293 @@ const Lead = require('./models/Lead');
 const Activity = require('./models/Activity');
 require('dotenv').config();
 
-const seedData = async () => {
+// Connect to MongoDB
+mongoose.connect(process.env.MONGO_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+}).then(() => {
+  console.log('✅ MongoDB connected for seeding');
+}).catch((err) => {
+  console.error('❌ MongoDB connection error:', err);
+  process.exit(1);
+});
+
+// Seed data
+const seedEmployees = [
+  {
+    firstName: 'Admin',
+    lastName: 'User',
+    email: 'admin@canovacrm.com',
+    password: 'admin',
+    location: 'New York',
+    preferredLanguage: 'English',
+    role: 'admin',
+    department: 'Management',
+    phone: '+1-555-0101'
+  },
+  {
+    firstName: 'John',
+    lastName: 'Smith',
+    email: 'john.smith@canovacrm.com',
+    password: 'employee',
+    location: 'New York',
+    preferredLanguage: 'English',
+    role: 'employee',
+    department: 'Sales',
+    phone: '+1-555-0102'
+  },
+  {
+    firstName: 'Maria',
+    lastName: 'Garcia',
+    email: 'maria.garcia@canovacrm.com',
+    password: 'employee',
+    location: 'Los Angeles',
+    preferredLanguage: 'Spanish',
+    role: 'employee',
+    department: 'Sales',
+    phone: '+1-555-0103'
+  },
+  {
+    firstName: 'David',
+    lastName: 'Chen',
+    email: 'david.chen@canovacrm.com',
+    password: 'employee',
+    location: 'San Francisco',
+    preferredLanguage: 'Mandarin',
+    role: 'employee',
+    department: 'Sales',
+    phone: '+1-555-0104'
+  },
+  {
+    firstName: 'Sarah',
+    lastName: 'Johnson',
+    email: 'sarah.johnson@canovacrm.com',
+    password: 'employee',
+    location: 'Chicago',
+    preferredLanguage: 'English',
+    role: 'employee',
+    department: 'Sales',
+    phone: '+1-555-0105'
+  }
+];
+
+const seedLeads = [
+  {
+    name: 'Alice Johnson',
+    email: 'alice@techcorp.com',
+    phone: '+1-555-0201',
+    company: 'Tech Corp',
+    source: 'Website',
+    status: 'open',
+    type: 'hot',
+    location: 'San Francisco',
+    preferredLanguage: 'English',
+    notes: 'Interested in enterprise solution',
+    value: 50000,
+    currency: 'USD',
+    tags: ['enterprise', 'tech']
+  },
+  {
+    name: 'Carlos Rodriguez',
+    email: 'carlos@innovate.com',
+    phone: '+1-555-0202',
+    company: 'Innovate Inc',
+    source: 'Referral',
+    status: 'contacted',
+    type: 'warm',
+    location: 'Miami',
+    preferredLanguage: 'Spanish',
+    notes: 'Follow up scheduled for next week',
+    value: 25000,
+    currency: 'USD',
+    tags: ['startup', 'innovation']
+  },
+  {
+    name: 'Li Wei',
+    email: 'li.wei@globaltech.com',
+    phone: '+1-555-0203',
+    company: 'Global Tech',
+    source: 'Cold Call',
+    status: 'qualified',
+    type: 'hot',
+    location: 'Seattle',
+    preferredLanguage: 'Mandarin',
+    notes: 'Very interested in our platform',
+    value: 75000,
+    currency: 'USD',
+    tags: ['enterprise', 'global']
+  },
+  {
+    name: 'Emma Wilson',
+    email: 'emma@startup.com',
+    phone: '+1-555-0204',
+    company: 'StartupXYZ',
+    source: 'Social Media',
+    status: 'open',
+    type: 'warm',
+    location: 'Austin',
+    preferredLanguage: 'English',
+    notes: 'Looking for growth solutions',
+    value: 15000,
+    currency: 'USD',
+    tags: ['startup', 'growth']
+  },
+  {
+    name: 'Ahmed Hassan',
+    email: 'ahmed@middleeast.com',
+    phone: '+1-555-0205',
+    company: 'Middle East Solutions',
+    source: 'Email Campaign',
+    status: 'proposal',
+    type: 'hot',
+    location: 'Dubai',
+    preferredLanguage: 'Arabic',
+    notes: 'Ready for proposal presentation',
+    value: 100000,
+    currency: 'USD',
+    tags: ['enterprise', 'middle-east']
+  },
+  {
+    name: 'Sophie Martin',
+    email: 'sophie@frenchtech.com',
+    phone: '+1-555-0206',
+    company: 'French Tech Solutions',
+    source: 'Trade Show',
+    status: 'negotiation',
+    type: 'hot',
+    location: 'Paris',
+    preferredLanguage: 'French',
+    notes: 'Final negotiations in progress',
+    value: 60000,
+    currency: 'EUR',
+    tags: ['enterprise', 'europe']
+  },
+  {
+    name: 'Raj Patel',
+    email: 'raj@indiatech.com',
+    phone: '+1-555-0207',
+    company: 'India Tech Solutions',
+    source: 'Website',
+    status: 'open',
+    type: 'cold',
+    location: 'Mumbai',
+    preferredLanguage: 'Hindi',
+    notes: 'Initial contact made',
+    value: 30000,
+    currency: 'INR',
+    tags: ['startup', 'india']
+  },
+  {
+    name: 'Yuki Tanaka',
+    email: 'yuki@japantech.com',
+    phone: '+1-555-0208',
+    company: 'Japan Tech Corp',
+    source: 'Referral',
+    status: 'contacted',
+    type: 'warm',
+    location: 'Tokyo',
+    preferredLanguage: 'Japanese',
+    notes: 'Scheduled demo next week',
+    value: 45000,
+    currency: 'JPY',
+    tags: ['enterprise', 'japan']
+  }
+];
+
+// Seed function
+const seedDatabase = async () => {
   try {
-    // Connect to MongoDB
-    await mongoose.connect(process.env.MONGO_URI);
-    console.log('Connected to MongoDB');
+    console.log('🌱 Starting database seeding...');
 
     // Clear existing data
     await Employee.deleteMany({});
     await Lead.deleteMany({});
     await Activity.deleteMany({});
-    console.log('Cleared existing data');
 
-    // Create admin user
-    const adminPassword = await bcrypt.hash('admin', 10);
-    const admin = new Employee({
-      firstName: 'Admin',
-      lastName: 'User',
-      email: 'admin@canovacrm.com',
-      location: 'New York',
-      preferredLanguage: 'English',
-      password: adminPassword,
-      role: 'admin',
-      status: 'active'
-    });
-    await admin.save();
-    console.log('Created admin user');
+    console.log('🗑️  Cleared existing data');
 
-    // Create sample employees
-    const employees = [
-      {
-        firstName: 'John',
-        lastName: 'Smith',
-        email: 'john.smith@canovacrm.com',
-        location: 'New York',
-        preferredLanguage: 'English',
-        password: 'Smith',
-        role: 'employee',
-        status: 'active'
-      },
-      {
-        firstName: 'Maria',
-        lastName: 'Garcia',
-        email: 'maria.garcia@canovacrm.com',
-        location: 'Los Angeles',
-        preferredLanguage: 'Spanish',
-        password: 'Garcia',
-        role: 'employee',
-        status: 'active'
-      },
-      {
-        firstName: 'David',
-        lastName: 'Chen',
-        email: 'david.chen@canovacrm.com',
-        location: 'San Francisco',
-        preferredLanguage: 'Mandarin',
-        password: 'Chen',
-        role: 'employee',
-        status: 'active'
-      },
-      {
-        firstName: 'Sarah',
-        lastName: 'Johnson',
-        email: 'sarah.johnson@canovacrm.com',
-        location: 'Chicago',
-        preferredLanguage: 'English',
-        password: 'Johnson',
-        role: 'employee',
-        status: 'active'
-      }
-    ];
-
-    for (const empData of employees) {
-      const empPassword = await bcrypt.hash(empData.password, 10);
-      const employee = new Employee({
-        ...empData,
-        password: empPassword
-      });
+    // Create employees
+    const createdEmployees = [];
+    for (const employeeData of seedEmployees) {
+      const employee = new Employee(employeeData);
       await employee.save();
+      createdEmployees.push(employee);
+      console.log(`👤 Created employee: ${employee.fullName}`);
     }
-    console.log('Created sample employees');
 
-    // Create sample leads
-    const leads = [
-      {
-        name: 'Alice Johnson',
-        email: 'alice.johnson@company.com',
-        phone: '+1-555-0101',
-        company: 'TechCorp',
-        source: 'Website',
-        location: 'New York',
-        preferredLanguage: 'English',
-        status: 'open',
-        type: 'hot'
-      },
-      {
-        name: 'Bob Wilson',
-        email: 'bob.wilson@startup.com',
-        phone: '+1-555-0102',
-        company: 'StartupXYZ',
-        source: 'Referral',
-        location: 'Los Angeles',
-        preferredLanguage: 'English',
-        status: 'open',
-        type: 'warm'
-      },
-      {
-        name: 'Carlos Rodriguez',
-        email: 'carlos.rodriguez@business.com',
-        phone: '+1-555-0103',
-        company: 'Business Inc',
-        source: 'Cold Call',
-        location: 'Miami',
-        preferredLanguage: 'Spanish',
-        status: 'closed',
-        type: 'hot',
-        closedDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000) // 2 days ago
-      },
-      {
-        name: 'Li Wei',
-        email: 'li.wei@enterprise.com',
-        phone: '+1-555-0104',
-        company: 'Enterprise Corp',
-        source: 'Website',
-        location: 'San Francisco',
-        preferredLanguage: 'Mandarin',
-        status: 'open',
-        type: 'cold'
+    // Create leads and assign some to employees
+    const createdLeads = [];
+    for (let i = 0; i < seedLeads.length; i++) {
+      const leadData = seedLeads[i];
+      
+      // Assign leads to employees (skip admin)
+      if (i < createdEmployees.length - 1) {
+        leadData.assignedTo = createdEmployees[i + 1]._id; // Skip admin (index 0)
+        leadData.assignedDate = new Date();
       }
-    ];
 
-    for (const leadData of leads) {
       const lead = new Lead(leadData);
       await lead.save();
-    }
-    console.log('Created sample leads');
+      createdLeads.push(lead);
+      console.log(`🎯 Created lead: ${lead.name}`);
 
-    // Create sample activities
-    const activities = [
+      // Update employee's assigned leads
+      if (leadData.assignedTo) {
+        await Employee.findByIdAndUpdate(leadData.assignedTo, {
+          $push: { assignedLeads: lead._id }
+        });
+      }
+    }
+
+    // Create some sample activities
+    const sampleActivities = [
       {
-        type: 'employee_added',
-        description: 'Admin User added new employee John Smith',
-        userId: admin._id,
-        targetEmployeeId: (await Employee.findOne({ email: 'john.smith@canovacrm.com' }))._id
+        user: createdEmployees[0]._id, // Admin
+        action: 'employee_created',
+        entityType: 'employee',
+        entityId: createdEmployees[1]._id,
+        description: `${createdEmployees[0].fullName} created new employee ${createdEmployees[1].fullName}`,
+        details: { role: 'employee', department: 'Sales' }
       },
       {
-        type: 'lead_added',
-        description: 'Admin User added new lead Alice Johnson',
-        userId: admin._id,
-        leadId: (await Lead.findOne({ email: 'alice.johnson@company.com' }))._id
+        user: createdEmployees[0]._id, // Admin
+        action: 'lead_created',
+        entityType: 'lead',
+        entityId: createdLeads[0]._id,
+        description: `${createdEmployees[0].fullName} created new lead ${createdLeads[0].name}`,
+        details: { status: 'open', type: 'hot' }
       },
       {
-        type: 'lead_closed',
-        description: 'Admin User closed lead Carlos Rodriguez',
-        userId: admin._id,
-        leadId: (await Lead.findOne({ email: 'carlos.rodriguez@business.com' }))._id
+        user: createdEmployees[1]._id, // John Smith
+        action: 'lead_assigned',
+        entityType: 'lead',
+        entityId: createdLeads[0]._id,
+        description: `${createdEmployees[1].fullName} was assigned lead ${createdLeads[0].name}`,
+        details: { assignedBy: createdEmployees[0].fullName }
       }
     ];
 
-    for (const activityData of activities) {
-      const activity = new Activity(activityData);
-      await activity.save();
+    for (const activityData of sampleActivities) {
+      await Activity.logActivity(activityData);
+      console.log(`📝 Created activity: ${activityData.description}`);
     }
-    console.log('Created sample activities');
 
-    console.log('Data seeding completed successfully!');
-    console.log('\nDemo Credentials:');
+    console.log('✅ Database seeding completed successfully!');
+    console.log(`📊 Created ${createdEmployees.length} employees`);
+    console.log(`🎯 Created ${createdLeads.length} leads`);
+    console.log(`📝 Created ${sampleActivities.length} activities`);
+
+    // Display login credentials
+    console.log('\n🔐 Login Credentials:');
     console.log('Admin: admin@canovacrm.com / admin');
-    console.log('Employee: john.smith@canovacrm.com / Smith');
+    console.log('Employee: john.smith@canovacrm.com / employee');
 
+    process.exit(0);
   } catch (error) {
-    console.error('Error seeding data:', error);
-  } finally {
-    await mongoose.disconnect();
-    console.log('Disconnected from MongoDB');
+    console.error('❌ Seeding error:', error);
+    process.exit(1);
   }
 };
 
-// Run the seed function if this file is executed directly
-if (require.main === module) {
-  seedData();
-}
-
-module.exports = seedData; 
+// Run seeding
+seedDatabase(); 

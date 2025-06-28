@@ -2,56 +2,171 @@ const jwt = require('jsonwebtoken');
 const Employee = require('../models/Employee');
 const Activity = require('../models/Activity');
 
-// Generate JWT Token
-const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: '30d',
-  });
+// Generate JWT token
+const generateToken = (userId) => {
+  return jwt.sign(
+    { userId },
+    process.env.JWT_SECRET,
+    { expiresIn: '24h' }
+  );
+};
+
+// @desc    Register new employee (Admin only)
+// @route   POST /api/auth/register
+// @access  Admin
+const registerEmployee = async (req, res) => {
+  try {
+    const {
+      firstName,
+      lastName,
+      email,
+      password,
+      location,
+      preferredLanguage,
+      phone,
+      department,
+      role = 'employee'
+    } = req.body;
+
+    // Check if user already exists
+    const existingEmployee = await Employee.findOne({ email });
+    if (existingEmployee) {
+      return res.status(400).json({
+        success: false,
+        message: 'Employee with this email already exists'
+      });
+    }
+
+    // Create new employee
+    const employee = new Employee({
+      firstName,
+      lastName,
+      email,
+      password,
+      location,
+      preferredLanguage,
+      phone,
+      department,
+      role
+    });
+
+    await employee.save();
+
+    // Log activity
+    await Activity.logActivity({
+      user: req.user._id,
+      action: 'employee_created',
+      entityType: 'employee',
+      entityId: employee._id,
+      description: `${req.user.fullName} created new employee ${employee.fullName}`,
+      details: { role, department }
+    });
+
+    // Return employee data without password
+    const employeeData = employee.getPublicProfile();
+
+    res.status(201).json({
+      success: true,
+      message: 'Employee registered successfully',
+      data: employeeData
+    });
+  } catch (error) {
+    console.error('Register error:', error);
+    
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({
+        success: false,
+        message: 'Validation error',
+        errors
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Server error during registration'
+    });
+  }
 };
 
 // @desc    Login employee
 // @route   POST /api/auth/login
 // @access  Public
-const login = async (req, res) => {
+const loginEmployee = async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    // Validate input
     if (!email || !password) {
-      return res.status(400).json({ message: 'Please provide email and password' });
+      return res.status(400).json({
+        success: false,
+        message: 'Email and password are required'
+      });
     }
 
+    // Find employee by email
     const employee = await Employee.findOne({ email });
-
     if (!employee) {
-      return res.status(401).json({ message: 'Invalid credentials' });
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials'
+      });
     }
 
-    const isMatch = await employee.comparePassword(password);
-
-    if (!isMatch) {
-      return res.status(401).json({ message: 'Invalid credentials' });
-    }
-
+    // Check if account is active
     if (employee.status !== 'active') {
-      return res.status(401).json({ message: 'Account is inactive' });
+      return res.status(401).json({
+        success: false,
+        message: 'Account is inactive. Please contact administrator.'
+      });
     }
 
+    // Verify password
+    const isPasswordValid = await employee.comparePassword(password);
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials'
+      });
+    }
+
+    // Update last login
+    await employee.updateLastLogin();
+
+    // Generate token
     const token = generateToken(employee._id);
 
+    // Log activity
+    await Activity.logActivity({
+      user: employee._id,
+      action: 'login',
+      entityType: 'auth',
+      description: `${employee.fullName} logged in`,
+      details: {
+        ipAddress: req.ip || req.connection.remoteAddress,
+        userAgent: req.get('User-Agent')
+      },
+      ipAddress: req.ip || req.connection.remoteAddress,
+      userAgent: req.get('User-Agent')
+    });
+
+    // Return employee data and token
+    const employeeData = employee.getPublicProfile();
+
     res.json({
-      _id: employee._id,
-      firstName: employee.firstName,
-      lastName: employee.lastName,
-      email: employee.email,
-      role: employee.role,
-      location: employee.location,
-      preferredLanguage: employee.preferredLanguage,
-      status: employee.status,
-      token
+      success: true,
+      message: 'Login successful',
+      data: {
+        employee: employeeData,
+        token
+      }
     });
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({
+      success: false,
+      message: 'Server error during login'
+    });
   }
 };
 
@@ -60,52 +175,95 @@ const login = async (req, res) => {
 // @access  Private
 const getProfile = async (req, res) => {
   try {
-    const employee = await Employee.findById(req.employee._id).select('-password');
-    res.json(employee);
+    const employee = await Employee.findById(req.user._id)
+      .select('-password')
+      .populate('assignedLeads', 'name email company status type');
+
+    if (!employee) {
+      return res.status(404).json({
+        success: false,
+        message: 'Employee not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: employee
+    });
   } catch (error) {
     console.error('Get profile error:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({
+      success: false,
+      message: 'Server error while fetching profile'
+    });
   }
 };
 
-// @desc    Update user profile
+// @desc    Update current user profile
 // @route   PUT /api/auth/profile
 // @access  Private
 const updateProfile = async (req, res) => {
   try {
-    const { firstName, lastName, email, location, preferredLanguage } = req.body;
+    const {
+      firstName,
+      lastName,
+      location,
+      preferredLanguage,
+      phone,
+      department
+    } = req.body;
 
-    const employee = await Employee.findById(req.employee._id);
-
+    // Find and update employee
+    const employee = await Employee.findById(req.user._id);
     if (!employee) {
-      return res.status(404).json({ message: 'Employee not found' });
+      return res.status(404).json({
+        success: false,
+        message: 'Employee not found'
+      });
     }
 
     // Update fields
     if (firstName) employee.firstName = firstName;
     if (lastName) employee.lastName = lastName;
-    if (email) employee.email = email;
     if (location) employee.location = location;
     if (preferredLanguage) employee.preferredLanguage = preferredLanguage;
+    if (phone) employee.phone = phone;
+    if (department) employee.department = department;
 
-    const updatedEmployee = await employee.save();
+    await employee.save();
+
+    // Log activity
+    await Activity.logActivity({
+      user: employee._id,
+      action: 'employee_updated',
+      entityType: 'employee',
+      entityId: employee._id,
+      description: `${employee.fullName} updated their profile`
+    });
+
+    const employeeData = employee.getPublicProfile();
 
     res.json({
-      _id: updatedEmployee._id,
-      firstName: updatedEmployee.firstName,
-      lastName: updatedEmployee.lastName,
-      email: updatedEmployee.email,
-      role: updatedEmployee.role,
-      location: updatedEmployee.location,
-      preferredLanguage: updatedEmployee.preferredLanguage,
-      status: updatedEmployee.status
+      success: true,
+      message: 'Profile updated successfully',
+      data: employeeData
     });
   } catch (error) {
     console.error('Update profile error:', error);
-    if (error.code === 11000) {
-      return res.status(400).json({ message: 'Email already exists' });
+    
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({
+        success: false,
+        message: 'Validation error',
+        errors
+      });
     }
-    res.status(500).json({ message: 'Server error' });
+
+    res.status(500).json({
+      success: false,
+      message: 'Server error while updating profile'
+    });
   }
 };
 
@@ -117,30 +275,121 @@ const changePassword = async (req, res) => {
     const { currentPassword, newPassword } = req.body;
 
     if (!currentPassword || !newPassword) {
-      return res.status(400).json({ message: 'Please provide current and new password' });
+      return res.status(400).json({
+        success: false,
+        message: 'Current password and new password are required'
+      });
     }
 
-    const employee = await Employee.findById(req.employee._id);
-
-    const isMatch = await employee.comparePassword(currentPassword);
-
-    if (!isMatch) {
-      return res.status(400).json({ message: 'Current password is incorrect' });
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'New password must be at least 6 characters long'
+      });
     }
 
+    // Find employee
+    const employee = await Employee.findById(req.user._id);
+    if (!employee) {
+      return res.status(404).json({
+        success: false,
+        message: 'Employee not found'
+      });
+    }
+
+    // Verify current password
+    const isCurrentPasswordValid = await employee.comparePassword(currentPassword);
+    if (!isCurrentPasswordValid) {
+      return res.status(400).json({
+        success: false,
+        message: 'Current password is incorrect'
+      });
+    }
+
+    // Update password
     employee.password = newPassword;
     await employee.save();
 
-    res.json({ message: 'Password updated successfully' });
+    // Log activity
+    await Activity.logActivity({
+      user: employee._id,
+      action: 'password_changed',
+      entityType: 'auth',
+      description: `${employee.fullName} changed their password`
+    });
+
+    res.json({
+      success: true,
+      message: 'Password changed successfully'
+    });
   } catch (error) {
     console.error('Change password error:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({
+      success: false,
+      message: 'Server error while changing password'
+    });
+  }
+};
+
+// @desc    Logout (client-side token removal)
+// @route   POST /api/auth/logout
+// @access  Private
+const logout = async (req, res) => {
+  try {
+    // Log activity
+    await Activity.logActivity({
+      user: req.user._id,
+      action: 'logout',
+      entityType: 'auth',
+      description: `${req.user.fullName} logged out`,
+      details: {
+        ipAddress: req.ip || req.connection.remoteAddress,
+        userAgent: req.get('User-Agent')
+      },
+      ipAddress: req.ip || req.connection.remoteAddress,
+      userAgent: req.get('User-Agent')
+    });
+
+    res.json({
+      success: true,
+      message: 'Logout successful'
+    });
+  } catch (error) {
+    console.error('Logout error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error during logout'
+    });
+  }
+};
+
+// @desc    Verify token validity
+// @route   GET /api/auth/verify
+// @access  Private
+const verifyToken = async (req, res) => {
+  try {
+    res.json({
+      success: true,
+      message: 'Token is valid',
+      data: {
+        user: req.user
+      }
+    });
+  } catch (error) {
+    console.error('Token verification error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error during token verification'
+    });
   }
 };
 
 module.exports = {
-  login,
+  registerEmployee,
+  loginEmployee,
   getProfile,
   updateProfile,
-  changePassword
+  changePassword,
+  logout,
+  verifyToken
 }; 
