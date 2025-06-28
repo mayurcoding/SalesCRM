@@ -3,41 +3,112 @@
   <head>
     <meta charset="utf-8" />
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#000000" />
-    <meta
-      name="description"
-      content="Web site created using create-react-app"
-    />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <meta name="theme-color" content="#2563eb" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Sales CRM" />
+    
+    <!-- Primary Meta Tags -->
+    <title>Sales CRM - Customer Relationship Management System</title>
+    <meta name="title" content="Sales CRM - Customer Relationship Management System" />
+    <meta name="description" content="Comprehensive Sales CRM system built with React and Node.js. Manage leads, employees, and sales analytics with real-time dashboard and smart lead distribution." />
+    <meta name="keywords" content="CRM, Sales CRM, Lead Management, Customer Relationship Management, React, Node.js, MongoDB" />
+    <meta name="author" content="Sales CRM Team" />
+    <meta name="robots" content="index, follow" />
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://your-vercel-domain.vercel.app/" />
+    <meta property="og:title" content="Sales CRM - Customer Relationship Management System" />
+    <meta property="og:description" content="Comprehensive Sales CRM system built with React and Node.js. Manage leads, employees, and sales analytics with real-time dashboard and smart lead distribution." />
+    <meta property="og:image" content="%PUBLIC_URL%/logo512.png" />
+    <meta property="og:site_name" content="Sales CRM" />
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://your-vercel-domain.vercel.app/" />
+    <meta property="twitter:title" content="Sales CRM - Customer Relationship Management System" />
+    <meta property="twitter:description" content="Comprehensive Sales CRM system built with React and Node.js. Manage leads, employees, and sales analytics with real-time dashboard and smart lead distribution." />
+    <meta property="twitter:image" content="%PUBLIC_URL%/logo512.png" />
+    
+    <!-- PWA Manifest -->
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
-    <!--
-      manifest.json provides metadata used when your web app is installed on a
-      user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
-    -->
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
-    <!--
-      Notice the use of %PUBLIC_URL% in the tags above.
-      It will be replaced with the URL of the `public` folder during the build.
-      Only files inside the `public` folder can be referenced from the HTML.
-
-      Unlike "/favicon.ico" or "favicon.ico", "%PUBLIC_URL%/favicon.ico" will
-      work correctly both with client-side routing and a non-root public URL.
-      Learn how to configure a non-root public URL by running `npm run build`.
-    -->
-    <title>React App</title>
+    
+    <!-- Preconnect to external domains for performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    
+    <!-- DNS Prefetch for API calls -->
+    <link rel="dns-prefetch" href="//api.vercel.app" />
+    
+    <!-- Vercel Analytics (optional) -->
+    <script defer src="/_vercel/insights/script.js"></script>
+    
+    <!-- Structured Data for SEO -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Sales CRM",
+      "description": "Comprehensive Sales CRM system for lead management and sales analytics",
+      "url": "https://your-vercel-domain.vercel.app/",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Web Browser",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      }
+    }
+    </script>
+    
+    <!-- Vercel Speed Insights (optional) -->
+    <script>
+      window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+    </script>
+    <script defer src="/_vercel/speed-insights/script.js"></script>
   </head>
   <body>
-    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <noscript>
+      <div style="text-align: center; padding: 50px; font-family: Arial, sans-serif;">
+        <h1>Sales CRM</h1>
+        <p>You need to enable JavaScript to run this application.</p>
+        <p>Please enable JavaScript in your browser settings and refresh the page.</p>
+      </div>
+    </noscript>
     <div id="root"></div>
-    <!--
-      This HTML file is a template.
-      If you open it directly in the browser, you will see an empty page.
-
-      You can add webfonts, meta tags, or analytics to this file.
-      The build step will place the bundled scripts into the <body> tag.
-
-      To begin the development, run `npm start` or `yarn start`.
-      To create a production bundle, use `npm run build` or `yarn build`.
-    -->
+    
+    <!-- Loading indicator for better UX -->
+    <div id="loading" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f8fafc; z-index: 9999; display: flex; align-items: center; justify-content: center;">
+      <div style="text-align: center;">
+        <div style="width: 40px; height: 40px; border: 4px solid #e2e8f0; border-top: 4px solid #2563eb; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
+        <p style="color: #64748b; font-family: Arial, sans-serif;">Loading Sales CRM...</p>
+      </div>
+    </div>
+    
+    <style>
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+    </style>
+    
+    <!-- Vercel deployment info -->
+    <script>
+      // Hide loading indicator when app is ready
+      window.addEventListener('load', function() {
+        const loading = document.getElementById('loading');
+        if (loading) {
+          loading.style.display = 'none';
+        }
+      });
+      
+      // Vercel environment detection
+      if (window.location.hostname.includes('vercel.app')) {
+        console.log('Running on Vercel');
+      }
+    </script>
   </body>
 </html>
